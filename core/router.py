@@ -5,17 +5,17 @@ ROUTER_MODEL = "gemma3:1b"
 ROUTER_PROMPT = """Classify this request with ONE word only.
 
 Rules:
-- simple: greetings, small talk, yes/no questions
-- code: write code, fix bug, script, programming, debug, function, class
-- normal: explain concept, summarize, translate, general question
-- advanced: complex analysis, architecture, deep reasoning
+- simple: greetings, compliments, small talk, short questions, yes/no
+- code: write code, fix bug, script, programming, debug, function, class, algorithm
+- normal: explain concept, summarize, translate, general question, advice
+- advanced: complex analysis, architecture, deep reasoning, research
 
 Request: {query}
 
 Reply with ONE word (simple/code/normal/advanced):"""
 
 MODEL_MAP = {
-    "simple":   "gemma3:1b",
+    "simple":   "gemma4",
     "normal":   "gemma4",
     "advanced": "qwen2.5:32b",
     "code":     "deepseek-coder-v2",
