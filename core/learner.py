@@ -18,6 +18,26 @@ Titre: {title}
 Résumé: {summary}"""
 
 
+MAX_KNOWLEDGE_MEMORIES = 200
+
+def cleanup_old_knowledge():
+    """Garde seulement les 200 dernières mémoires de type knowledge."""
+    import sqlite3
+    conn = sqlite3.connect("nova.db")
+    conn.execute("""
+        DELETE FROM memories 
+        WHERE category = 'knowledge' 
+        AND id NOT IN (
+            SELECT id FROM memories 
+            WHERE category = 'knowledge' 
+            ORDER BY created DESC 
+            LIMIT ?
+        )
+    """, (MAX_KNOWLEDGE_MEMORIES,))
+    conn.commit()
+    conn.close()
+
+
 def learn_from_feeds():
     """Scanne les flux RSS et sauvegarde les infos importantes."""
     print("Nexus learning from web...")
@@ -39,4 +59,5 @@ def learn_from_feeds():
                         save_memory(parts[0].strip(), parts[1].strip())
         except Exception as e:
             print(f"Error learning from {url}: {e}")
+    cleanup_old_knowledge()
     print("Learning done.")
