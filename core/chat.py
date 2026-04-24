@@ -65,7 +65,7 @@ def build_messages(history: list[dict], user_input: str, memories: list[dict], e
     return messages
 
 
-def chat(history: list[dict], user_input: str, memories: list[dict], forced_model: str = None) -> tuple[str, str]:
+def chat(history: list[dict], user_input: str, memories: list[dict], forced_model: str = None, force_search: bool = False) -> tuple[str, str]:
     model = forced_model if forced_model else route(user_input)
 
     # Météo en temps réel
@@ -79,8 +79,8 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         extract_and_save_memory(user_input, reply)
         return reply, model
 
-    # Web search
-    if should_search(user_input):
+    # Web search — manuel ou automatique
+    if force_search or should_search(user_input):
         search_results = web_search(user_input)
         messages = build_messages(history, user_input, memories, search_results, "search")
         response = ollama.chat(model=model, messages=messages)

@@ -476,6 +476,22 @@
         }
 
         #send-btn:hover { background: var(--cyan-dim); }
+
+        #search-btn {
+            padding: 10px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-dim);
+            font-size: 1rem;
+            cursor: pointer;
+            height: 44px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        #search-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+        #search-btn.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,188,212,0.1); }
         #send-btn:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
 
         /* ── MOBILE ── */
@@ -802,6 +818,7 @@
             <!-- INPUT -->
             <div id="input-area">
                 <input type="text" id="user-input" placeholder="Parle à Nova..." inputmode="text" enterkeyhint="send" autocomplete="off" />
+                <button id="search-btn" onclick="toggleSearch()" title="Recherche web">🔍</button>
                 <button id="send-btn" onclick="sendMessage()">Envoyer</button>
             </div>
         </div>
@@ -951,6 +968,14 @@
     let currentConvId = null;
     let isThinking = false;
     let currentMode = localStorage.getItem("nova_mode") || "auto";
+    let searchEnabled = false;
+
+    function toggleSearch() {
+        searchEnabled = !searchEnabled;
+        const btn = document.getElementById("search-btn");
+        btn.classList.toggle("active", searchEnabled);
+        btn.title = searchEnabled ? "Recherche web activée" : "Recherche web";
+    }
 
     if (token) initApp();
     document.addEventListener("DOMContentLoaded", applyLang);
@@ -1205,7 +1230,8 @@
             body: JSON.stringify({
                 message: text,
                 conversation_id: currentConvId,
-                mode: currentMode
+                mode: currentMode,
+                search: searchEnabled
             })
         });
 
@@ -1219,6 +1245,8 @@
 
         isThinking = false;
         btn.disabled = false;
+        searchEnabled = false;
+        document.getElementById("search-btn").classList.remove("active");
         input.focus();
 
         loadConversations();
