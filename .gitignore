@@ -5,3 +5,4 @@ core/auth.py
 core/auth.py
 .env
 nova.db
+nova.db
