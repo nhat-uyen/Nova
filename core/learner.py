@@ -3,25 +3,35 @@ import ollama
 from core.memory import save_memory
 
 SOURCES = [
+    # Tech & IA
     "https://hnrss.org/frontpage",
     "https://www.reddit.com/r/LocalLLaMA/.rss",
     "https://www.reddit.com/r/selfhosted/.rss",
+    "https://www.reddit.com/r/opensource/.rss",
+    "https://www.reddit.com/r/linux/.rss",
+    "https://www.reddit.com/r/programming/.rss",
+    # IA News
+    "https://www.reddit.com/r/artificial/.rss",
+    "https://www.reddit.com/r/MachineLearning/.rss",
+    # Tech général
+    "https://feeds.arstechnica.com/arstechnica/technology-lab",
+    "https://www.wired.com/feed/rss",
 ]
 
-EXTRACT_PROMPT = """Lis ce titre et résumé d'article. 
-Si c'est une information technique importante sur l'IA, Linux, ou la technologie, 
-extrais l'info clé en une phrase courte.
+EXTRACT_PROMPT = """Lis ce titre et résumé d'article.
+Si c'est une information technique importante sur l'IA, Linux, la technologie ou la programmation,
+extrais l'info clé en une phrase courte et factuelle.
 Réponds avec: SAVE:knowledge:ta phrase courte
 Sinon réponds: NOTHING
 
 Titre: {title}
 Résumé: {summary}"""
 
+MAX_KNOWLEDGE_MEMORIES = 500
 
-MAX_KNOWLEDGE_MEMORIES = 200
 
 def cleanup_old_knowledge():
-    """Garde seulement les 200 dernières mémoires de type knowledge."""
+    """Garde seulement les 500 dernières mémoires de type knowledge."""
     import sqlite3
     conn = sqlite3.connect("nova.db")
     conn.execute("""
@@ -40,11 +50,11 @@ def cleanup_old_knowledge():
 
 def learn_from_feeds():
     """Scanne les flux RSS et sauvegarde les infos importantes."""
-    print("Nexus learning from web...")
+    print("Nova learning from web...")
     for url in SOURCES:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:5]:
+            for entry in feed.entries[:3]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:500]
                 prompt = EXTRACT_PROMPT.format(title=title, summary=summary)
@@ -60,4 +70,4 @@ def learn_from_feeds():
         except Exception as e:
             print(f"Error learning from {url}: {e}")
     cleanup_old_knowledge()
-    print("Learning done.")
+    print("Nova learning done.")
