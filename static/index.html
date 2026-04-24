@@ -562,7 +562,10 @@
         <div id="sidebar">
             <div id="sidebar-header">
                 <span>⬡ NOVA</span>
-                <button id="new-conv-btn" onclick="newConversation()">+ Nouveau</button>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button id="lang-btn" onclick="toggleLang()" style="padding:4px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-family:monospace;font-size:0.75rem;cursor:pointer;">EN</button>
+                    <button id="new-conv-btn" onclick="newConversation()">+ Nouveau</button>
+                </div>
             </div>
             <div id="conversations-list"></div>
             <div id="sidebar-footer">
@@ -624,12 +627,129 @@
 </div>
 
 <script>
+    const i18n = {
+        fr: {
+            title: "⬡ NOVA",
+            username: "Utilisateur",
+            password: "Mot de passe",
+            login: "Connexion",
+            error_fields: "Remplis tous les champs.",
+            error_creds: "Identifiants incorrects.",
+            new_conv: "+ Nouveau",
+            logout: "Déconnexion",
+            no_conv: "Aucune conversation",
+            select_conv: "Sélectionne une conversation",
+            new_conv_title: "Nouvelle conversation",
+            empty_state: "Commence une nouvelle conversation",
+            placeholder: "Parle à Nova...",
+            send: "Envoyer",
+            thinking: "réfléchit...",
+            you: "Toi",
+            copy: "copier",
+            copied: "copié!",
+            mode: "Mode",
+            mode_auto_desc: "Router decides automatically",
+            mode_chat_desc: "Forces gemma4",
+            mode_code_desc: "Forces deepseek-coder-v2",
+            mode_deep_desc: "Forces qwen2.5:32b",
+        },
+        en: {
+            title: "⬡ NOVA",
+            username: "Username",
+            password: "Password",
+            login: "Login",
+            error_fields: "Please fill in all fields.",
+            error_creds: "Invalid credentials.",
+            new_conv: "+ New",
+            logout: "Logout",
+            no_conv: "No conversations",
+            select_conv: "Select a conversation",
+            new_conv_title: "New conversation",
+            empty_state: "Start a new conversation",
+            placeholder: "Talk to Nova...",
+            send: "Send",
+            thinking: "thinking...",
+            you: "You",
+            copy: "copy",
+            copied: "copied!",
+            mode: "Mode",
+            mode_auto_desc: "Router decides automatically",
+            mode_chat_desc: "Forces gemma4",
+            mode_code_desc: "Forces deepseek-coder-v2",
+            mode_deep_desc: "Forces qwen2.5:32b",
+        }
+    };
+
+    let lang = localStorage.getItem("nova_lang") || "fr";
+
+    function t(key) {
+        return i18n[lang][key] || key;
+    }
+
+    function applyLang() {
+        // Login
+        document.querySelectorAll(".login-field label")[0].textContent = t("username");
+        document.querySelectorAll(".login-field label")[1].textContent = t("password");
+        document.getElementById("login-btn").textContent = t("login");
+
+        // Sidebar
+        document.getElementById("new-conv-btn").textContent = t("new_conv");
+        document.getElementById("logout-btn").textContent = t("logout");
+        document.getElementById("sidebar-header").querySelector("span").textContent = t("title");
+
+        // Input
+        document.getElementById("user-input").placeholder = t("placeholder");
+        document.getElementById("send-btn").textContent = t("send");
+
+        // Mode bar
+        const modeLabel = document.getElementById("mode-label-text");
+        if (modeLabel) modeLabel.textContent = t("mode") + " :";
+
+        // Mode descriptions
+        const autoDesc = document.querySelector("[data-mode=auto] .mode-desc");
+        const chatDesc = document.querySelector("[data-mode=chat] .mode-desc");
+        const codeDesc = document.querySelector("[data-mode=code] .mode-desc");
+        const deepDesc = document.querySelector("[data-mode=deep] .mode-desc");
+        if (autoDesc) autoDesc.textContent = t("mode_auto_desc");
+        if (chatDesc) chatDesc.textContent = t("mode_chat_desc");
+        if (codeDesc) codeDesc.textContent = t("mode_code_desc");
+        if (deepDesc) deepDesc.textContent = t("mode_deep_desc");
+
+        // Chat header
+        const chatTitle = document.getElementById("chat-title");
+        if (chatTitle && chatTitle.textContent === "Sélectionne une conversation" || 
+            chatTitle && chatTitle.textContent === "Select a conversation") {
+            chatTitle.textContent = t("select_conv");
+        }
+
+        // Empty state
+        const emptySpan = document.querySelector("#empty-state span");
+        if (emptySpan) emptySpan.textContent = t("empty_state");
+
+        // Lang button
+        const langBtn = document.getElementById("lang-btn");
+        if (langBtn) langBtn.textContent = lang === "fr" ? "FR" : "EN";
+
+        // Conversations list empty
+        const noConv = document.querySelector("#conversations-list div");
+        if (noConv && (noConv.textContent === "Aucune conversation" || noConv.textContent === "No conversations")) {
+            noConv.textContent = t("no_conv");
+        }
+    }
+
+    function toggleLang() {
+        lang = lang === "fr" ? "en" : "fr";
+        localStorage.setItem("nova_lang", lang);
+        applyLang();
+    }
+
     let token = localStorage.getItem("nova_token");
     let currentConvId = null;
     let isThinking = false;
     let currentMode = localStorage.getItem("nova_mode") || "auto";
 
     if (token) initApp();
+    document.addEventListener("DOMContentLoaded", applyLang);
 
     // ── LOGIN ──
     document.getElementById("password-input").addEventListener("keydown", e => {
