@@ -1265,7 +1265,7 @@
     }
 
     // ── MESSAGES ──
-    function appendMessage(role, content, model) {
+    function appendMessage(role, content, model, imageB64) {
         const emptyState = document.getElementById("empty-state");
         if (emptyState) emptyState.remove();
 
@@ -1279,7 +1279,19 @@
 
         const bubble = document.createElement("div");
         bubble.className = `message ${role}`;
-        bubble.textContent = content;
+
+        if (imageB64) {
+            const img = document.createElement("img");
+            img.src = `data:image/webp;base64,${imageB64}`;
+            img.style.cssText = "max-width:100%;max-height:300px;border-radius:8px;display:block;margin-bottom:6px;";
+            bubble.appendChild(img);
+        }
+
+        if (content) {
+            const text = document.createElement("span");
+            text.textContent = content;
+            bubble.appendChild(text);
+        }
 
         if (role === "nova") {
             const copyBtn = document.createElement("button");
@@ -1327,7 +1339,7 @@
         isThinking = true;
         btn.disabled = true;
 
-        appendMessage("user", text || "📷 Image");
+        appendMessage("user", text || "", null, currentImage);
 
         const messagesEl = document.getElementById("messages");
         const thinkingRow = document.createElement("div");
