@@ -164,7 +164,7 @@ def delete_conversation(conversation_id: int):
 
 
 def list_memories() -> list[dict]:
-    """Charge tous les souvenirs avec leurs métadonnées complètes."""
+    """Charge tous les souvenirs avec id et created — pour l'interface web (pas pour les prompts)."""
     with _get_connection() as conn:
         rows = conn.execute(
             "SELECT id, category, content, created FROM memories ORDER BY created DESC"
