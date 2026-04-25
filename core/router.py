@@ -5,10 +5,13 @@ ROUTER_MODEL = "gemma3:1b"
 ROUTER_PROMPT = """Classify this request with ONE word only.
 
 Rules:
-- simple: greetings, compliments, small talk, short questions, yes/no
-- code: write code, fix bug, script, programming, debug, function, class, algorithm
-- normal: explain concept, summarize, translate, general question, advice, search
-- advanced: complex analysis, architecture, deep reasoning, research
+- simple: greetings, compliments, small talk, short questions, yes/no, casual chat
+- code: ONLY when user explicitly asks to CREATE, WRITE, BUILD or FIX actual code, scripts, apps, functions, programs
+- normal: explain concept, summarize, translate, general question, advice, search, news, specs, memory
+- advanced: complex analysis, architecture, deep reasoning, research, long documents
+
+Examples of code: "write a python script", "create an app", "fix this bug", "build a function"
+Examples of NOT code: "how does python work", "what is docker", "tell me about programming"
 
 Request: {query}
 
