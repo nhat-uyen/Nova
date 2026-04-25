@@ -1321,13 +1321,13 @@
         const input = document.getElementById("user-input");
         const btn = document.getElementById("send-btn");
         const text = input.value.trim();
-        if (!text) return;
+        if (!text && !currentImage) return;
 
         input.value = "";
         isThinking = true;
         btn.disabled = true;
 
-        appendMessage("user", text);
+        appendMessage("user", text || "📷 Image");
 
         const messagesEl = document.getElementById("messages");
         const thinkingRow = document.createElement("div");

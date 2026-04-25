@@ -21,20 +21,22 @@ Réponds uniquement avec SAVE:... ou NOTHING:"""
 SEARCH_SYSTEM_PROMPT = """Tu es Nova, un assistant personnel intelligent.
 Tu as effectué une recherche web pour répondre à cette question.
 Utilise les résultats ci-dessous pour donner une réponse précise et à jour.
-Réponds toujours en français de manière naturelle et concise.
+Réponds toujours dans la langue de l'utilisateur de manière naturelle et concise.
 
 Résultats de recherche:
 {search_results}"""
 
 WEATHER_SYSTEM_PROMPT = """Tu es Nova, un assistant personnel intelligent.
 Tu as récupéré les données météo en temps réel pour répondre à cette question.
-Utilise ces données pour donner une réponse claire et naturelle en français.
+Utilise ces données pour donner une réponse claire et naturelle.
+Réponds dans la langue de l'utilisateur.
 
 Données météo:
 {weather_data}"""
 
 
 def extract_and_save_memory(user_message: str, assistant_response: str):
+    """Extrait automatiquement les infos importantes et les sauvegarde."""
     prompt = MEMORY_EXTRACTION_PROMPT.format(
         user_message=user_message,
         assistant_response=assistant_response
@@ -50,7 +52,8 @@ def extract_and_save_memory(user_message: str, assistant_response: str):
             save_memory(parts[0].strip(), parts[1].strip())
 
 
-def build_messages(history: list[dict], user_input: str, memories: list[dict], extra_context: str = None, context_type: str = None, image: str = None) -> list[dict]:
+def build_messages(history: list[dict], user_input: str, memories: list[dict], extra_context: str = None, context_type: str = None) -> list[dict]:
+    """Construit la liste de messages à envoyer à Ollama."""
     if context_type == "weather":
         system_prompt = WEATHER_SYSTEM_PROMPT.format(weather_data=extra_context)
     elif context_type == "search":
@@ -61,25 +64,32 @@ def build_messages(history: list[dict], user_input: str, memories: list[dict], e
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history[-CHAT_HISTORY_LIMIT:]
-
-    if image:
-        messages.append({
-            "role": "user",
-            "content": user_input or "Analyse cette image.",
-            "images": [image]
-        })
-    else:
-        messages.append({"role": "user", "content": user_input})
-
+    messages.append({"role": "user", "content": user_input})
     return messages
 
 
+def build_image_messages(user_input: str, image: str) -> list[dict]:
+    """Construit les messages pour une requête avec image — sans historique."""
+    return [{
+        "role": "user",
+        "content": user_input or "Analyse et décris cette image.",
+        "images": [image]
+    }]
+
+
 def chat(history: list[dict], user_input: str, memories: list[dict], forced_model: str = None, force_search: bool = False, image: str = None) -> tuple[str, str]:
-    # Si image → force gemma4 (vision)
+    """Envoie un message à Nova et retourne sa réponse et le modèle utilisé."""
+
+    # Image → gemma4 vision direct
     if image:
-        model = "gemma4"
-    else:
-        model = forced_model if forced_model else route(user_input)
+        print(f"CHAT IMAGE: True len={len(image)}")
+        messages = build_image_messages(user_input, image)
+        response = ollama.chat(model="gemma4", messages=messages)
+        reply = response["message"]["content"]
+        extract_and_save_memory(user_input or "image", reply)
+        return reply, "gemma4"
+
+    model = forced_model if forced_model else route(user_input)
 
     # Météo en temps réel
     weather_city = detect_weather_city(user_input)
@@ -89,16 +99,14 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         messages = build_messages(history, user_input, memories, weather_data, "weather")
         response = ollama.chat(model=model, messages=messages)
         reply = response["message"]["content"]
-        extract_and_save_memory(user_input, reply)
         return reply, model
 
-    # Web search — manuel ou automatique
+    # Web search
     if force_search or should_search(user_input):
         search_results = web_search(user_input)
         messages = build_messages(history, user_input, memories, search_results, "search")
         response = ollama.chat(model=model, messages=messages)
         reply = response["message"]["content"]
-        extract_and_save_memory(user_input, reply)
         return reply, model
 
     # Chat normal
