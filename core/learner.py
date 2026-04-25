@@ -16,6 +16,10 @@ SOURCES = [
     # Tech général
     "https://feeds.arstechnica.com/arstechnica/technology-lab",
     "https://www.wired.com/feed/rss",
+    # Mozilla & Firefox
+    "https://blog.mozilla.org/en/feed/",
+    "https://www.mozilla.org/en-US/firefox/releases/notes/feed/",
+    "https://hacks.mozilla.org/feed/",
 ]
 
 EXTRACT_PROMPT = """Lis ce titre et résumé d'article.
