@@ -1,8 +1,8 @@
 import subprocess
 import json
-import ollama
 from datetime import datetime
 from config import MODELS
+from core.ollama_client import client
 
 # Deduplicated in case two roles share a model
 TRACKED_MODELS = list(dict.fromkeys(MODELS.values()))
@@ -11,7 +11,7 @@ TRACKED_MODELS = list(dict.fromkeys(MODELS.values()))
 def get_local_model_digest(model_name: str) -> str:
     """Retourne le digest local d'un modèle."""
     try:
-        models = ollama.list()
+        models = client.list()
         for model in models.get("models", []):
             if model["name"].startswith(model_name):
                 return model.get("digest", "")

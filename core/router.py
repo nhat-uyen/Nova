@@ -1,5 +1,5 @@
-import ollama
 from config import MODELS
+from core.ollama_client import client
 
 ROUTER_PROMPT = """Classify this request with ONE word only.
 
@@ -29,7 +29,7 @@ FALLBACK_MODEL = MODELS["default"]
 def route(user_input: str) -> str:
     """Choisit le bon modèle selon la complexité de la requête."""
     prompt = ROUTER_PROMPT.format(query=user_input)
-    response = ollama.chat(
+    response = client.chat(
         model=MODELS["router"],
         messages=[{"role": "user", "content": prompt}]
     )

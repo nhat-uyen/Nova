@@ -1,7 +1,7 @@
 import feedparser
-import ollama
 from config import MODELS
 from core.memory import save_memory, cleanup_old_knowledge
+from core.ollama_client import client
 
 SOURCES = [
     # Tech & IA
@@ -45,7 +45,7 @@ def learn_from_feeds():
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:500]
                 prompt = EXTRACT_PROMPT.format(title=title, summary=summary)
-                response = ollama.chat(
+                response = client.chat(
                     model=MODELS["router"],
                     messages=[{"role": "user", "content": prompt}]
                 )

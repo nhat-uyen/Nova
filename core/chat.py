@@ -1,5 +1,5 @@
-import ollama
 from config import NOVA_SYSTEM_PROMPT, CHAT_HISTORY_LIMIT, MODELS
+from core.ollama_client import client
 from core.memory import format_memories_for_prompt, save_memory
 from core.router import route
 from core.search import web_search, should_search
@@ -41,7 +41,7 @@ def extract_and_save_memory(user_message: str, assistant_response: str):
         user_message=user_message,
         assistant_response=assistant_response
     )
-    response = ollama.chat(
+    response = client.chat(
         model=MODELS["default"],
         messages=[{"role": "user", "content": prompt}]
     )
@@ -84,7 +84,7 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
     if image:
         print(f"CHAT IMAGE: True len={len(image)}")
         messages = build_image_messages(user_input, image)
-        response = ollama.chat(model=MODELS["default"], messages=messages)
+        response = client.chat(model=MODELS["default"], messages=messages)
         reply = response["message"]["content"]
         extract_and_save_memory(user_input or "image", reply)
         return reply, MODELS["default"]
@@ -97,7 +97,7 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         lat, lon, city = weather_city
         weather_data = get_weather(lat, lon, city)
         messages = build_messages(history, user_input, memories, weather_data, "weather")
-        response = ollama.chat(model=model, messages=messages)
+        response = client.chat(model=model, messages=messages)
         reply = response["message"]["content"]
         return reply, model
 
@@ -105,13 +105,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
     if force_search or should_search(user_input):
         search_results = web_search(user_input)
         messages = build_messages(history, user_input, memories, search_results, "search")
-        response = ollama.chat(model=model, messages=messages)
+        response = client.chat(model=model, messages=messages)
         reply = response["message"]["content"]
         return reply, model
 
     # Chat normal
     messages = build_messages(history, user_input, memories)
-    response = ollama.chat(model=model, messages=messages)
+    response = client.chat(model=model, messages=messages)
     reply = response["message"]["content"]
 
     # Si Nova sait pas → cherche sur le web automatiquement
@@ -127,7 +127,7 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         search_results = web_search(user_input)
         if search_results and "Aucun résultat" not in search_results:
             messages = build_messages(history, user_input, memories, search_results, "search")
-            response = ollama.chat(model=model, messages=messages)
+            response = client.chat(model=model, messages=messages)
             reply = response["message"]["content"]
 
     extract_and_save_memory(user_input, reply)
