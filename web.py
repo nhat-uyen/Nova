@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from core.auth import verify_credentials, create_token, verify_token
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -18,7 +18,7 @@ from core.memory import (
     get_setting, save_setting,
     list_memories, update_memory, delete_memory,
 )
-from config import MODELS
+from config import MODELS, ALLOWED_SETTINGS
 
 security = HTTPBearer()
 
@@ -70,6 +70,21 @@ class MemoryUpdateRequest(BaseModel):
 class MemoryAddRequest(BaseModel):
     category: str
     content: str
+
+
+class SettingsUpdateRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    ram_budget: int | None = None
+
+    @field_validator("ram_budget")
+    @classmethod
+    def validate_ram_budget(cls, v):
+        if v is not None:
+            spec = ALLOWED_SETTINGS["ram_budget"]
+            if not (spec["min"] <= v <= spec["max"]):
+                raise ValueError(f"must be between {spec['min']} and {spec['max']}")
+        return v
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -188,9 +203,9 @@ def trigger_model_update(_: bool = Depends(get_current_user)):
 
 
 @app.post("/settings")
-def update_settings(data: dict, _: bool = Depends(get_current_user)):
-    for key, value in data.items():
-        save_setting(key, str(value))
+def update_settings(data: SettingsUpdateRequest, _: bool = Depends(get_current_user)):
+    if data.ram_budget is not None:
+        save_setting("ram_budget", str(data.ram_budget))
     return {"ok": True}
 
 

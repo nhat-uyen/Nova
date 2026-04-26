@@ -82,3 +82,7 @@ LOCALISATION:
 {memories}"""
 
 CHAT_HISTORY_LIMIT = 20
+
+ALLOWED_SETTINGS = {
+    "ram_budget": {"type": int, "min": 256, "max": 16384},
+}
