@@ -85,3 +85,31 @@ def test_time_word_soir_is_no_city():
 
 def test_time_word_cette_semaine_is_no_city():
     assert detect_weather_city("météo cette semaine") == "no_city"
+
+
+def test_weather_adjective_froid_is_no_city():
+    assert detect_weather_city("météo froid") == "no_city"
+
+
+def test_weather_adjective_pluie_is_no_city():
+    assert detect_weather_city("météo pluie") == "no_city"
+
+
+def test_weather_adjective_neige_is_no_city():
+    assert detect_weather_city("météo neige") == "no_city"
+
+
+def test_weather_adjective_ensoleille_is_no_city():
+    assert detect_weather_city("météo ensoleillé") == "no_city"
+
+
+def test_weather_adjective_cold_is_no_city():
+    assert detect_weather_city("weather cold") == "no_city"
+
+
+def test_weather_adjective_sunny_is_no_city():
+    assert detect_weather_city("weather sunny") == "no_city"
+
+
+def test_weather_adjective_forecast_is_no_city():
+    assert detect_weather_city("weather forecast") == "no_city"

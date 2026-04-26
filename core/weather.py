@@ -72,11 +72,26 @@ _TIME_WORDS = {
     "afternoon", "now", "soon", "later", "week", "weekend", "next",
 }
 
+# Weather descriptors and conditions that are not city names
+_WEATHER_CONTEXT_WORDS = {
+    # French
+    "froid", "chaud", "pluie", "neige", "soleil", "vent", "nuage", "nuageux",
+    "ensoleillé", "pluvieux", "orageux", "brouillard", "brume", "gel", "verglas",
+    "humide", "sec", "doux", "frais", "frisquet", "glacial", "tempête",
+    "beau", "mauvais", "prévision", "prévisions",
+    # English
+    "rain", "rainy", "snow", "snowy", "sun", "sunny", "wind", "windy",
+    "cloud", "cloudy", "cold", "hot", "warm", "cool", "fog", "foggy",
+    "stormy", "storm", "forecast", "hail",
+}
+
+_CITY_IGNORED = _NOISE | _TIME_WORDS | _WEATHER_CONTEXT_WORDS
+
 
 def _has_unrecognized_city(lower_input: str) -> bool:
-    """Returns True if the input contains a word that looks like an unsupported city name."""
+    """Returns True if the input contains a token that realistically looks like a city name."""
     words = re.sub(r"[^\w\s]", " ", lower_input).split()
-    return any(w not in _NOISE and w not in _TIME_WORDS and len(w) > 1 for w in words)
+    return any(w not in _CITY_IGNORED and len(w) > 1 for w in words)
 
 
 def detect_weather_city(user_input: str):
