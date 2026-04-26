@@ -8,8 +8,14 @@ DB_PATH = "nova.db"
 
 def backup_db():
     """Copie nova.db → nova.db.backup avant chaque écriture."""
+    backup = DB_PATH + ".backup"
+    if os.path.exists(backup):
+        try:
+            os.replace(backup, backup + ".1")
+        except OSError:
+            pass
     if os.path.exists(DB_PATH):
-        shutil.copy2(DB_PATH, DB_PATH + ".backup")
+        shutil.copy2(DB_PATH, backup)
 
 
 def _get_connection() -> sqlite3.Connection:
