@@ -35,6 +35,13 @@ Données météo:
 {weather_data}"""
 
 
+def is_weather_query(text: str) -> bool:
+    """Détecte si la requête concerne la météo."""
+    keywords = ["météo", "temperature", "température", "weather", "il fait combien"]
+    lower = text.lower()
+    return any(k in lower for k in keywords)
+
+
 def extract_and_save_memory(user_message: str, assistant_response: str):
     """Extrait automatiquement les infos importantes et les sauvegarde."""
     prompt = MEMORY_EXTRACTION_PROMPT.format(
@@ -100,6 +107,10 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         response = client.chat(model=model, messages=messages)
         reply = response["message"]["content"]
         return reply, model
+
+    # Weather query but no city recognized → short clarification, no LLM
+    if is_weather_query(user_input):
+        return "Précise la ville.", model
 
     # Web search
     if force_search or should_search(user_input):
