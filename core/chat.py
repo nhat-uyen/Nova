@@ -108,8 +108,12 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         reply = response["message"]["content"]
         return reply, model
 
-    # Web search — skip for weather queries (handled by weather tool above)
-    if not is_weather_query(user_input) and (force_search or should_search(user_input)):
+    # Weather query but no city recognized → short clarification, no LLM
+    if is_weather_query(user_input):
+        return "Précise la ville.", model
+
+    # Web search
+    if force_search or should_search(user_input):
         search_results = web_search(user_input)
         messages = build_messages(history, user_input, memories, search_results, "search")
         response = client.chat(model=model, messages=messages)
@@ -130,7 +134,7 @@ def chat(history: list[dict], user_input: str, memories: list[dict], forced_mode
         "je ne suis pas sûr", "je ne suis pas certain",
     ]
     
-    if not is_weather_query(user_input) and any(t in reply.lower() for t in uncertainty_triggers):
+    if any(t in reply.lower() for t in uncertainty_triggers):
         search_results = web_search(user_input)
         if search_results and "Aucun résultat" not in search_results:
             messages = build_messages(history, user_input, memories, search_results, "search")
