@@ -1,4 +1,7 @@
 import feedparser
+import httpx
+import ollama
+import sqlite3
 from config import MODELS
 from core.memory import save_memory, cleanup_old_knowledge
 from core.ollama_client import client
@@ -54,7 +57,8 @@ def learn_from_feeds():
                     parts = result[5:].split(":", 1)
                     if len(parts) == 2:
                         save_memory(parts[0].strip(), parts[1].strip())
-        except Exception as e:
+        except (ollama.ResponseError, ConnectionError, httpx.HTTPError,
+                KeyError, sqlite3.OperationalError, sqlite3.DatabaseError) as e:
             print(f"Error learning from {url}: {e}")
     cleanup_old_knowledge(MAX_KNOWLEDGE_MEMORIES)
     print("Nova learning done.")
