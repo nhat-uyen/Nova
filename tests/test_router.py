@@ -1,6 +1,5 @@
 import httpx
 import ollama
-import pytest
 from unittest.mock import patch
 from config import MODELS
 from core.router import route, FALLBACK_MODEL
