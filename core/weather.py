@@ -51,7 +51,7 @@ _NOISE = {
     "quel", "quelle", "quels", "quelles", "fait", "il", "y", "a", "à",
     "de", "du", "des", "la", "le", "les", "un", "une", "pour", "en",
     "et", "ou", "je", "tu", "nous", "vous", "comment", "est", "c",
-    "qu", "combien", "quand", "où",
+    "qu", "combien", "quand", "où", "ce", "cet", "cette", "ces",
     # common contextual words
     "actuelle", "actuel", "aujourd", "hui", "maintenant",
     # English function words
@@ -61,11 +61,22 @@ _NOISE = {
     "s", "d", "l", "m", "n", "j", "t",
 }
 
+# Time/context words that look like content but are not city names
+_TIME_WORDS = {
+    # French
+    "demain", "aujourd'hui", "maintenant", "hier", "matin", "soir",
+    "midi", "nuit", "semaine", "weekend", "week-end", "prochain",
+    "prochaine", "après-midi", "aprem",
+    # English
+    "today", "tomorrow", "yesterday", "morning", "evening", "night",
+    "afternoon", "now", "soon", "later", "week", "weekend", "next",
+}
+
 
 def _has_unrecognized_city(lower_input: str) -> bool:
     """Returns True if the input contains a word that looks like an unsupported city name."""
     words = re.sub(r"[^\w\s]", " ", lower_input).split()
-    return any(w not in _NOISE and len(w) > 1 for w in words)
+    return any(w not in _NOISE and w not in _TIME_WORDS and len(w) > 1 for w in words)
 
 
 def detect_weather_city(user_input: str):

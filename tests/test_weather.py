@@ -65,3 +65,23 @@ def test_non_weather_query_returns_none():
 def test_non_weather_query_with_city_name_returns_none():
     # mentioning a city without a weather keyword is not a weather query
     assert detect_weather_city("je suis à Montréal") is None
+
+
+def test_time_word_demain_is_no_city():
+    assert detect_weather_city("météo demain") == "no_city"
+
+
+def test_time_word_today_is_no_city():
+    assert detect_weather_city("weather today") == "no_city"
+
+
+def test_time_word_tomorrow_is_no_city():
+    assert detect_weather_city("weather tomorrow") == "no_city"
+
+
+def test_time_word_soir_is_no_city():
+    assert detect_weather_city("météo ce soir") == "no_city"
+
+
+def test_time_word_cette_semaine_is_no_city():
+    assert detect_weather_city("météo cette semaine") == "no_city"
