@@ -18,7 +18,7 @@ git pull origin main
 git checkout -b feature/your-change-name
 ```
 
-Examples
+## Examples
 feature/add-download-status
 fix/crash-on-start
 refactor/split-modules
@@ -28,9 +28,12 @@ All changes must go through a Pull Request to main.
 
 Before opening a PR:
 
+```
 git fetch origin
 git rebase origin/main
-Important rules
+```
+
+## Important rules
 
 One change per PR.
 
@@ -40,7 +43,7 @@ Do not change LICENSE or packaging unless required.
 
 Keep the code simple and readable.
 
-Maintainer branch
+## Maintainer branch
 
 The branch dev/thezupzup-private is used only by the maintainer for fast development.
 
