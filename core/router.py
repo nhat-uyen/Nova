@@ -39,7 +39,8 @@ def route(user_input: str) -> str:
             model=MODELS["router"],
             messages=[{"role": "user", "content": prompt}]
         )
-        category = response["message"]["content"].strip().lower().split()[0]
+        content = response["message"]["content"].strip().lower()
+        category = content.split()[0] if content else ""
         return MODEL_MAP.get(category, FALLBACK_MODEL)
     except (ollama.ResponseError, ConnectionError, httpx.HTTPError) as e:
         logger.warning("Router model unavailable, falling back to default: %s", e)
