@@ -49,10 +49,10 @@ The branch dev/thezupzup-private is used only by the maintainer for fast develop
 
 Please do not use it.
 
-Summary
+## Summary
 
 Work on your own branch.
 
-Open a PR to main.
+Open a PR to `main`.
 
 Keep changes small and clean.
