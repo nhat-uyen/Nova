@@ -160,7 +160,7 @@
         #conversations-list {
             flex: 1;
             overflow-y: auto;
-            padding: 8px;
+            padding: 6px 8px;
         }
 
         .conv-item {
@@ -176,7 +176,7 @@
         }
 
         .conv-item:hover { background: var(--bg3); }
-        .conv-item.active { background: var(--bg3); border-color: var(--border); }
+        .conv-item.active { background: var(--bg3); border-color: var(--border); border-left: 2px solid var(--cyan); }
 
         .conv-title {
             flex: 1;
@@ -820,6 +820,100 @@
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* ── CHANNEL BADGE ── */
+        #channel-wrapper {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        #channel-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .channel-badge {
+            font-size: 0.65rem;
+            font-family: monospace;
+            font-weight: bold;
+            letter-spacing: 1px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            border: 1px solid;
+            text-transform: uppercase;
+            transition: opacity 0.2s;
+        }
+
+        .channel-badge:hover { opacity: 0.8; }
+
+        .channel-stable { color: var(--cyan); border-color: var(--cyan); background: rgba(0,188,212,0.08); }
+        .channel-beta   { color: #ffb74d;    border-color: #ffb74d;    background: rgba(255,183,77,0.08); }
+        .channel-alpha  { color: #ce93d8;    border-color: #ce93d8;    background: rgba(206,147,216,0.08); }
+
+        #channel-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            min-width: 210px;
+            z-index: 100;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+
+        #channel-dropdown.open { display: block; }
+
+        .channel-option a {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            text-decoration: none;
+            color: var(--text);
+            font-size: 0.85rem;
+            font-family: monospace;
+            transition: background 0.15s;
+        }
+
+        .channel-option a:hover { background: var(--bg3); }
+        .channel-option.active a { background: var(--bg3); color: var(--cyan); }
+
+        .channel-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .channel-dot.stable { background: var(--cyan); }
+        .channel-dot.beta   { background: #ffb74d; }
+        .channel-dot.alpha  { background: #ce93d8; }
+
+        .channel-opt-url {
+            margin-left: auto;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .channel-option.active .channel-opt-url { color: var(--cyan-dim); }
+
+        #channel-branch-row {
+            display: none;
+            padding: 7px 14px 9px;
+            border-top: 1px solid var(--border);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            font-family: monospace;
+        }
+
+        #channel-branch-row.show { display: block; }
     </style>
 </head>
 <body>
@@ -864,7 +958,36 @@
         <div id="main">
             <div id="chat-header">
                 <button id="menu-toggle" onclick="toggleSidebar()">☰</button>
-                <span id="chat-title">Sélectionne une conversation</span>
+                <span id="chat-title">Discute avec Nova</span>
+                <div id="channel-wrapper">
+                    <button id="channel-btn" onclick="toggleChannelDropdown()" title="Release channel">
+                        <span id="channel-badge" class="channel-badge channel-stable">STABLE</span>
+                    </button>
+                    <div id="channel-dropdown">
+                        <div class="channel-option" data-channel="stable">
+                            <a href="https://nova.borealnode.ca">
+                                <span class="channel-dot stable"></span>
+                                Stable
+                                <span class="channel-opt-url">nova.borealnode.ca</span>
+                            </a>
+                        </div>
+                        <div class="channel-option" data-channel="beta">
+                            <a href="https://beta.nova.borealnode.ca">
+                                <span class="channel-dot beta"></span>
+                                Beta
+                                <span class="channel-opt-url">beta.nova.borealnode.ca</span>
+                            </a>
+                        </div>
+                        <div class="channel-option" id="channel-alpha-opt" data-channel="alpha" style="display:none">
+                            <a href="https://alpha.nova.borealnode.ca">
+                                <span class="channel-dot alpha"></span>
+                                Alpha
+                                <span class="channel-opt-url">alpha.nova.borealnode.ca</span>
+                            </a>
+                        </div>
+                        <div id="channel-branch-row"></div>
+                    </div>
+                </div>
                 <span id="model-badge">—</span>
             </div>
 
@@ -995,9 +1118,9 @@
             new_conv: "+ Nouveau",
             logout: "Déconnexion",
             no_conv: "Aucune conversation",
-            select_conv: "Sélectionne une conversation",
+            select_conv: "Discute avec Nova",
             new_conv_title: "Nouvelle conversation",
-            empty_state: "Commence une nouvelle conversation",
+            empty_state: "Discute avec Nova",
             placeholder: "Parle à Nova...",
             send: "Envoyer",
             thinking: "réfléchit...",
@@ -1023,9 +1146,9 @@
             new_conv: "+ New",
             logout: "Logout",
             no_conv: "No conversations",
-            select_conv: "Select a conversation",
+            select_conv: "Start chatting with Nova",
             new_conv_title: "New conversation",
-            empty_state: "Start a new conversation",
+            empty_state: "Start chatting with Nova",
             placeholder: "Talk to Nova...",
             send: "Send",
             thinking: "thinking...",
@@ -1075,11 +1198,12 @@
         if (codeDesc) codeDesc.textContent = t("mode_code_desc");
         if (deepDesc) deepDesc.textContent = t("mode_deep_desc");
 
-        // Chat header
+        // Chat header — update only when no real conversation title is set
         const chatTitle = document.getElementById("chat-title");
-        if (chatTitle && chatTitle.textContent === "Sélectionne une conversation" || 
-            chatTitle && chatTitle.textContent === "Select a conversation") {
-            chatTitle.textContent = t("select_conv");
+        const neutralTitles = ["Sélectionne une conversation", "Select a conversation",
+            "Discute avec Nova", "Start chatting with Nova", "Nouvelle conversation", "New conversation"];
+        if (chatTitle && neutralTitles.includes(chatTitle.textContent)) {
+            chatTitle.textContent = currentConvId === null ? t("select_conv") : chatTitle.textContent;
         }
 
         // Empty state
@@ -1090,9 +1214,9 @@
         const langBtn = document.getElementById("lang-btn");
         if (langBtn) langBtn.textContent = lang === "fr" ? "FR" : "EN";
 
-        // Conversations list empty
+        // Conversations list empty label
         const noConv = document.querySelector("#conversations-list div");
-        if (noConv && (noConv.textContent === "Aucune conversation" || noConv.textContent === "No conversations")) {
+        if (noConv && !noConv.classList.contains("conv-item")) {
             noConv.textContent = t("no_conv");
         }
     }
@@ -1187,12 +1311,59 @@
         location.reload();
     }
 
+    // ── CHANNEL ──
+    async function loadChannelInfo() {
+        try {
+            const res = await fetch("/channel");
+            if (res.ok) {
+                const data = await res.json();
+                const channel = (data.channel || "stable").toLowerCase();
+                const admin = !!data.admin_ui_enabled;
+
+                const badge = document.getElementById("channel-badge");
+                if (badge) {
+                    badge.textContent = channel.toUpperCase();
+                    badge.className = "channel-badge channel-" + channel;
+                }
+
+                document.querySelectorAll(".channel-option").forEach(opt => {
+                    opt.classList.toggle("active", opt.dataset.channel === channel);
+                });
+
+                const alphaOpt = document.getElementById("channel-alpha-opt");
+                if (alphaOpt) alphaOpt.style.display = admin ? "" : "none";
+
+                const branchRow = document.getElementById("channel-branch-row");
+                if (branchRow) {
+                    if (admin && data.branch) {
+                        branchRow.textContent = "branch: " + data.branch;
+                        branchRow.classList.add("show");
+                    } else {
+                        branchRow.classList.remove("show");
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+    function toggleChannelDropdown() {
+        document.getElementById("channel-dropdown").classList.toggle("open");
+    }
+
+    document.addEventListener("click", function(e) {
+        const wrapper = document.getElementById("channel-wrapper");
+        if (wrapper && !wrapper.contains(e.target)) {
+            document.getElementById("channel-dropdown").classList.remove("open");
+        }
+    });
+
     // ── INIT ──
     function initApp() {
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("app").style.display = "flex";
         setMode(currentMode);
         loadConversations();
+        loadChannelInfo();
     }
 
     // ── SIDEBAR ──
@@ -1236,6 +1407,11 @@
         if (res.status === 401) { logout(); return; }
         const convs = await res.json();
         renderConversations(convs);
+
+        if (currentConvId === null && convs.length > 0) {
+            const sorted = [...convs].sort((a, b) => b.id - a.id);
+            openConversation(sorted[0].id, sorted[0].title);
+        }
     }
 
     function renderConversations(convs) {
@@ -1243,11 +1419,12 @@
         list.innerHTML = "";
 
         if (convs.length === 0) {
-            list.innerHTML = '<div style="padding:16px;color:var(--text-dim);font-size:0.8rem;">Aucune conversation</div>';
+            list.innerHTML = '<div style="padding:12px 16px;color:var(--text-dim);font-size:0.8rem;">Aucune conversation</div>';
             return;
         }
 
-        for (const conv of convs) {
+        const sorted = [...convs].sort((a, b) => b.id - a.id).slice(0, 15);
+        for (const conv of sorted) {
             const div = document.createElement("div");
             div.className = "conv-item" + (conv.id === currentConvId ? " active" : "");
             div.dataset.id = conv.id;
@@ -1260,19 +1437,19 @@
         }
     }
 
-    async function newConversation() {
+    function newConversation() {
         currentConvId = null;
         document.getElementById("messages").innerHTML = `
             <div id="empty-state">
                 <h2>⬡ NOVA</h2>
-                <span>Commence une nouvelle conversation</span>
+                <span>${t("empty_state")}</span>
             </div>
         `;
-        document.getElementById("chat-title").textContent = "Nouvelle conversation";
+        document.getElementById("chat-title").textContent = t("new_conv_title");
         document.getElementById("model-badge").textContent = "—";
         document.querySelectorAll(".conv-item").forEach(el => el.classList.remove("active"));
-        document.getElementById("user-input").focus();
         closeSidebar();
+        document.getElementById("user-input").focus();
     }
 
     async function openConversation(id, title) {
@@ -1297,6 +1474,7 @@
 
         messagesEl.scrollTop = messagesEl.scrollHeight;
         closeSidebar();
+        document.getElementById("user-input").focus();
     }
 
     async function deleteConversation(event, id) {
