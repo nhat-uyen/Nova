@@ -200,7 +200,6 @@ Short version:
 
 Check the [open issues](https://github.com/TheZupZup/Nova/issues) on GitHub, particularly those labelled `good first issue`. Current tracked issues suitable for new contributors:
 
-- [#3](https://github.com/TheZupZup/Nova/issues/3) Add a favicon to the web interface
 - [#23](https://github.com/TheZupZup/Nova/issues/23) Persist the selected model mode across sessions
 - [#49](https://github.com/TheZupZup/Nova/issues/49) Add `max_length` constraints to relevant input fields
 - [#66](https://github.com/TheZupZup/Nova/issues/66) Replace deprecated `datetime.utcnow()` calls
