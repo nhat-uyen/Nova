@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
 
+from core.active_generation_tracker import tracker
 from core.auth import (
     CurrentUser,
     authenticate,
@@ -19,7 +20,7 @@ from core.rate_limiter import check_login_rate_limit
 from apscheduler.schedulers.background import BackgroundScheduler
 from core.learner import learn_from_feeds
 from core.updater import check_and_update_models
-from core.chat import chat, chat_stream
+from core.chat import RequestCancelled, chat, chat_stream
 from core.memory_command import handle_manual_memory_command
 from core.session_continuity import build_session_continuity
 from core.memory import (
@@ -174,7 +175,6 @@ scheduler = BackgroundScheduler()
 if NOVA_AUTO_WEB_LEARNING:
     scheduler.add_job(learn_from_feeds, "interval", hours=1)
 scheduler.add_job(check_and_update_models, "interval", weeks=1)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1083,10 +1083,6 @@ def chat_endpoint(request: ChatRequest, user: CurrentUser = Depends(get_current_
         }
 
     conversation_id = _resolve_conversation_id(request, user)
-    # The conversation is the single source of truth for the active
-    # project: a new thread was just created in the validated project,
-    # an existing one keeps its own. Memory is scoped to it so a project
-    # session sees global + that project's memory and nothing else.
     active_project_id = get_conversation_project_id(conversation_id, user.id)
     memories = load_memories(user.id, project_scope=active_project_id)
 
@@ -1098,14 +1094,25 @@ def chat_endpoint(request: ChatRequest, user: CurrentUser = Depends(get_current_
     forced_model = _resolve_forced_model(request, user)
     _check_forced_model_access(forced_model, user)
 
-    response, model_used = chat(
-        history, request.message, memories, user.id,
-        forced_model=forced_model,
-        force_search=request.search,
-        image=request.image,
-        policy=policy,
-        project_id=active_project_id,
+    request_id = tracker._request_id()
+    cancel_event = tracker._register_active_generation(
+        request_id, user.id, conversation_id
     )
+    try:
+        response, model_used = chat(
+            history, request.message, memories, user.id,
+            forced_model=forced_model,
+            force_search=request.search,
+            image=request.image,
+            policy=policy,
+            project_id=active_project_id,
+            request_id=request_id,
+            cancel_event=cancel_event,
+        )
+    except RequestCancelled:
+        raise HTTPException(status_code=503, detail="Chat generation cancelled.")
+    finally:
+        tracker._unregister_active_generation(request_id)
 
     user_message_id = save_message(
         conversation_id, "user", request.message
@@ -1121,6 +1128,7 @@ def chat_endpoint(request: ChatRequest, user: CurrentUser = Depends(get_current_
         "response": response,
         "model": model_used,
         "conversation_id": conversation_id,
+        "request_id": request_id,
         "user_message_id": user_message_id,
         "assistant_message_id": assistant_message_id,
     }
@@ -1162,6 +1170,7 @@ def chat_stream_endpoint(
     conversation never shows a half-baked response.
     """
     policy, short_reply, short_model = _chat_preflight(request, user)
+    request_id = tracker._request_id()
 
     if short_reply is not None:
         # Short-circuit replies (memory commands, "what do you remember")
@@ -1170,11 +1179,19 @@ def chat_stream_endpoint(
         conv_id = request.conversation_id
 
         def _short_circuit():
-            yield _stream_event({"type": "meta", "model": short_model,
-                                 "conversation_id": conv_id})
+            yield _stream_event({
+                "type": "meta",
+                "model": short_model,
+                "conversation_id": conv_id,
+                "request_id": request_id,
+            })
             yield _stream_event({"type": "delta", "content": short_reply})
-            yield _stream_event({"type": "done", "model": short_model,
-                                 "conversation_id": conv_id})
+            yield _stream_event({
+                "type": "done",
+                "model": short_model,
+                "conversation_id": conv_id,
+                "request_id": request_id,
+            })
 
         return StreamingResponse(_short_circuit(), media_type="application/x-ndjson")
 
@@ -1193,6 +1210,10 @@ def chat_stream_endpoint(
     forced_model = _resolve_forced_model(request, user)
     _check_forced_model_access(forced_model, user)
 
+    cancel_event = tracker._register_active_generation(
+        request_id, user.id, conversation_id
+    )
+
     def _generate():
         # `chat_stream` mirrors the synchronous `chat()` path: it does
         # routing, weather/search/security gating, and uncertainty
@@ -1204,6 +1225,8 @@ def chat_stream_endpoint(
             image=request.image,
             policy=policy,
             project_id=active_project_id,
+            request_id=request_id,
+            cancel_event=cancel_event,
         )
 
         final_reply = ""
@@ -1218,6 +1241,7 @@ def chat_stream_endpoint(
                         "type": "meta",
                         "model": final_model,
                         "conversation_id": conversation_id,
+                        "request_id": request_id,
                     })
                 elif etype == "delta":
                     yield _stream_event(event)
@@ -1238,6 +1262,7 @@ def chat_stream_endpoint(
                         yield _stream_event({
                             "type": "error",
                             "detail": EMPTY_REPLY_DETAIL,
+                            "request_id": request_id,
                         })
                         return
                     # Persist only once we know the full reply landed
@@ -1263,6 +1288,7 @@ def chat_stream_endpoint(
                         "type": "done",
                         "model": final_model,
                         "conversation_id": conversation_id,
+                        "request_id": request_id,
                         "user_message_id": user_message_id,
                         "assistant_message_id": assistant_message_id,
                     })
@@ -1271,13 +1297,27 @@ def chat_stream_endpoint(
                     yield _stream_event({
                         "type": "error",
                         "detail": event.get("detail", "stream error"),
+                        "request_id": request_id,
                     })
                     return
+        except RequestCancelled:
+            yield _stream_event({
+                "type": "error",
+                "detail": "generation cancelled",
+                "request_id": request_id,
+            })
+            return
         except Exception as exc:  # pragma: no cover — defensive
             # Whatever happens we must terminate the stream tidily so
             # the client unblocks and shows a calm error state.
-            yield _stream_event({"type": "error", "detail": str(exc) or "stream error"})
+            yield _stream_event({
+                "type": "error",
+                "detail": str(exc) or "stream error",
+                "request_id": request_id,
+            })
             return
+        finally:
+            tracker._unregister_active_generation(request_id)
 
         # Defensive fallthrough — chat_stream should always end with
         # either `done` or `error`. If it does not (e.g. generator
@@ -1300,6 +1340,18 @@ def chat_stream_endpoint(
         media_type="application/x-ndjson",
         headers=headers,
     )
+
+
+@app.post("/chat/cancel/{request_id}")
+def cancel_chat_endpoint(
+    request_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    active = tracker._get_active_generation(request_id)
+    if not active or active.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Generation not found.")
+    active.cancel_event.set()
+    return {"request_id": request_id, "cancelled": True}
 
 
 # ── MEMORY ENDPOINTS ──

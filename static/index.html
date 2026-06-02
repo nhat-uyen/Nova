@@ -4625,6 +4625,7 @@
     let activeChatController = null;
     let activeThinkingRow = null;
     let activeStreamBubble = null;
+    let activeRequestId = null;
     let userCancelledChat = false;
     let allConversations = [];
     let convSearchQuery = "";
@@ -4711,9 +4712,33 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
+    async function cancelGeneration() {
+        try {
+            const res = await fetch(`/chat/cancel/${encodeURIComponent(activeRequestId)}`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                let detail = "";
+                try { 
+                    detail = (await res.json())?.detail || ""; 
+                } catch {}
+                return;
+            }
+        } catch (e) {
+            appendMessage("nova", "Unable to cancel generation (network error).");
+        }
+    }
+
     function stopMessage() {
         if (!isThinking) return;
         userCancelledChat = true;
+        // If the server knows about this generation, ask it to cancel
+        // so provider-side work can be interrupted. Otherwise fall back
+        // to the local abort behavior.
+        if (activeRequestId) {
+            cancelGeneration();
+        }
         if (activeChatController) {
             activeChatController.abort();
         }
@@ -4731,6 +4756,7 @@
         appendStoppedNotice();
         isThinking = false;
         activeChatController = null;
+        activeRequestId = null;
         setSendButtonToSend();
         document.getElementById("user-input")?.focus();
     }
@@ -7800,6 +7826,7 @@
             activeChatController = null;
             activeStreamBubble = null;
             setSendButtonToSend();
+            activeRequestId = null;
             searchEnabled = false;
             document.getElementById("search-btn").classList.remove("active");
             removeImage();
@@ -7835,6 +7862,9 @@
                         result.conversationId = event.conversation_id;
                     }
                     if (event.model) result.model = event.model;
+                    if (event.request_id) {
+                        activeRequestId = event.request_id;
+                    }
                     break;
                 }
                 case "delta": {
@@ -7897,6 +7927,8 @@
                         result.model,
                         result.assistantMessageId || null,
                     );
+                    // generation finished — clear any server-side cancel handle
+                    activeRequestId = null;
                     break;
                 }
                 case "error": {
@@ -7908,6 +7940,7 @@
                     }
                     if (thinkingRow.isConnected) thinkingRow.remove();
                     activeThinkingRow = null;
+                    activeRequestId = null;
                     break;
                 }
                 default:
@@ -7962,6 +7995,8 @@
                     || "Nova didn't produce a reply. Please try again.";
             }
         }
+        // Clear any server-side cancel handle
+        activeRequestId = null;
         if (thinkingRow.isConnected) thinkingRow.remove();
         activeThinkingRow = null;
         return result;

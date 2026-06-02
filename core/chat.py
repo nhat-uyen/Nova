@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import Iterator
 from config import NOVA_SYSTEM_PROMPT, CHAT_HISTORY_LIMIT
 from core.model_providers import (
@@ -45,6 +46,15 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_UNAVAILABLE = "Ollama is unreachable. Make sure Ollama is running, then try again."
 
+
+class RequestCancelled(Exception):
+    """Raised when users cancel request aborts a generation."""
+
+def _check_cancellation(cancel_event: threading.Event | None) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise RequestCancelled()
+
+
 # Phrases that, when present in a first-pass reply, mean Nova does not
 # actually know the answer. The non-streaming chat() retries with web
 # search; chat_stream() emits a `replace` event then re-streams. Kept
@@ -64,7 +74,9 @@ def _reply_is_uncertain(reply: str) -> bool:
     return any(trigger in lowered for trigger in UNCERTAINTY_TRIGGERS)
 
 
-def _generate(model: str, messages: list[dict]) -> str:
+def _generate(model: str, messages: list[dict], 
+              request_id: str | None = None,
+              cancel_event: threading.Event | None = None,) -> str:
     """One non-streamed generation through the active model provider.
 
     Nova core no longer talks to any concrete client library: it asks the
@@ -74,9 +86,18 @@ def _generate(model: str, messages: list[dict]) -> str:
     own transport failures to :class:`ModelProviderError`, which the chat
     entrypoints translate to the existing user-facing "unreachable" reply.
     """
+    _check_cancellation(cancel_event)
     response = get_provider().generate(
-        ModelRequest(model=model, messages=messages)
+        ModelRequest(
+            model=model,
+            messages=messages,
+            options={
+                "request_id": request_id,
+                "cancel_event": cancel_event,
+            },
+        )
     )
+    _check_cancellation(cancel_event)
     return response.content
 
 
@@ -354,7 +375,19 @@ def build_image_messages(user_input: str, image: str) -> list[dict]:
     }]
 
 
-def chat(history: list[dict], user_input: str, memories: list[dict], user_id: int, forced_model: str = None, force_search: bool = False, image: str = None, policy: Policy | None = None, project_id: int | None = None) -> tuple[str, str]:  # noqa: E501
+def chat(
+    history: list[dict],
+    user_input: str,
+    memories: list[dict],
+    user_id: int,
+    forced_model: str = None,
+    force_search: bool = False,
+    image: str = None,
+    policy: Policy | None = None,
+    project_id: int | None = None,
+    request_id: str | None = None,
+    cancel_event: threading.Event | None = None,
+) -> tuple[str, str]:  # noqa: E501
     """
     Envoie un message à Nova et retourne sa réponse et le modèle utilisé.
 
@@ -383,7 +416,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], user_id: in
             logger.debug("Processing image request, encoded length=%d", len(image))
             messages = build_image_messages(user_input, image)
             default_model = resolve_default_model()
-            reply = _generate(default_model, messages)
+            reply = _generate(
+                default_model,
+                messages,
+                request_id=request_id,
+                cancel_event=cancel_event,
+            )
+            _check_cancellation(cancel_event)
             if _autosave_allowed(policy, user_input, reply):
                 extract_and_save_memory(
                     user_input or "image", reply, user_id, project_id
@@ -428,7 +467,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], user_id: in
                     personalization=personalization,
                     feedback_preferences=feedback_prefs, companion_mode=companion_mode,
                 )
-                reply = _generate(model, messages)
+                reply = _generate(
+                    model,
+                    messages,
+                    request_id=request_id,
+                    cancel_event=cancel_event,
+                )
+                _check_cancellation(cancel_event)
                 return reply, model
 
             if weather_result in ("no_city", "multiple"):
@@ -448,7 +493,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], user_id: in
                     personalization=personalization,
                     feedback_preferences=feedback_prefs, companion_mode=companion_mode,
                 )
-                reply = _generate(model, messages)
+                reply = _generate(
+                    model,
+                    messages,
+                    request_id=request_id,
+                    cancel_event=cancel_event,
+                )
+                _check_cancellation(cancel_event)
                 return reply, model
 
         # Web search — both the explicit `force_search` flag and the
@@ -460,7 +511,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], user_id: in
                 personalization=personalization,
                 feedback_preferences=feedback_prefs, companion_mode=companion_mode,
             )
-            reply = _generate(model, messages)
+            reply = _generate(
+                model,
+                messages,
+                request_id=request_id,
+                cancel_event=cancel_event,
+            )
+            _check_cancellation(cancel_event)
             return reply, model
 
         # Chat normal — inject relevant natural memories into context
@@ -470,7 +527,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], user_id: in
             personalization=personalization,
             feedback_preferences=feedback_prefs, companion_mode=companion_mode,
         )
-        reply = _generate(model, messages)
+        reply = _generate(
+            model,
+            messages,
+            request_id=request_id,
+            cancel_event=cancel_event,
+        )
+        _check_cancellation(cancel_event)
 
         # Si Nova sait pas → cherche sur le web automatiquement
         if policy.web_search_enabled and _reply_is_uncertain(reply):
@@ -481,7 +544,13 @@ def chat(history: list[dict], user_input: str, memories: list[dict], user_id: in
                     personalization=personalization,
                     feedback_preferences=feedback_prefs, companion_mode=companion_mode,
                 )
-                reply = _generate(model, messages)
+                reply = _generate(
+                    model,
+                    messages,
+                    request_id=request_id,
+                    cancel_event=cancel_event,
+                )
+                _check_cancellation(cancel_event)
 
         if _autosave_allowed(policy, user_input, reply):
             extract_and_save_memory(user_input, reply, user_id, project_id)
@@ -505,6 +574,8 @@ def chat_stream(
     image: str = None,
     policy: Policy | None = None,
     project_id: int | None = None,
+    request_id: str | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Iterator[dict]:
     """Generator twin of :func:`chat` that yields incremental events.
 
@@ -537,7 +608,13 @@ def chat_stream(
             logger.debug("Processing streaming-image request, encoded length=%d", len(image))
             messages = build_image_messages(user_input, image)
             default_model = resolve_default_model()
-            reply = _generate(default_model, messages)
+            reply = _generate(
+                default_model,
+                messages,
+                request_id=request_id,
+                cancel_event=cancel_event,
+            )
+            _check_cancellation(cancel_event)
             if _autosave_allowed(policy, user_input, reply):
                 extract_and_save_memory(
                     user_input or "image", reply, user_id, project_id
@@ -584,7 +661,10 @@ def chat_stream(
                     "weather", personalization=personalization,
                     feedback_preferences=feedback_prefs, companion_mode=companion_mode,
                 )
-                reply = yield from _stream_and_accumulate(model, messages)
+                reply = yield from _stream_and_accumulate(
+                    model, messages, request_id=request_id,
+                    cancel_event=cancel_event,
+                )
                 yield {"type": "done", "reply": reply, "model": model}
                 return
 
@@ -609,7 +689,10 @@ def chat_stream(
                     "security", personalization=personalization,
                     feedback_preferences=feedback_prefs, companion_mode=companion_mode,
                 )
-                reply = yield from _stream_and_accumulate(model, messages)
+                reply = yield from _stream_and_accumulate(
+                    model, messages, request_id=request_id,
+                    cancel_event=cancel_event,
+                )
                 yield {"type": "done", "reply": reply, "model": model}
                 return
 
@@ -621,7 +704,10 @@ def chat_stream(
                 "search", personalization=personalization,
                 feedback_preferences=feedback_prefs, companion_mode=companion_mode,
             )
-            reply = yield from _stream_and_accumulate(model, messages)
+            reply = yield from _stream_and_accumulate(
+                model, messages, request_id=request_id,
+                cancel_event=cancel_event,
+            )
             yield {"type": "done", "reply": reply, "model": model}
             return
 
@@ -631,7 +717,15 @@ def chat_stream(
             natural_memories=natural_mems, personalization=personalization,
             feedback_preferences=feedback_prefs, companion_mode=companion_mode,
         )
-        reply = yield from _stream_and_accumulate(model, messages)
+        reply = yield from _stream_and_accumulate(
+            model,
+            messages,
+            request_id=request_id,
+            cancel_event=cancel_event,
+        )
+        if cancel_event is not None and cancel_event.is_set():
+            yield {"type": "error", "detail": "generation cancelled"}
+            return
 
         # Uncertainty fallback (same trigger set as the non-streaming
         # path). We clear the bubble via `replace` then stream the
@@ -646,7 +740,19 @@ def chat_stream(
                     "search", personalization=personalization,
                     feedback_preferences=feedback_prefs, companion_mode=companion_mode,
                 )
-                reply = yield from _stream_and_accumulate(model, messages)
+                reply = yield from _stream_and_accumulate(
+                    model,
+                    messages,
+                    request_id=request_id,
+                    cancel_event=cancel_event,
+                )
+                if cancel_event is not None and cancel_event.is_set():
+                    yield {"type": "error", "detail": "generation cancelled"}
+                    return
+
+        if cancel_event is not None and cancel_event.is_set():
+            yield {"type": "error", "detail": "generation cancelled"}
+            return
 
         if _autosave_allowed(policy, user_input, reply):
             extract_and_save_memory(user_input, reply, user_id, project_id)
@@ -661,7 +767,8 @@ def chat_stream(
         yield {"type": "error", "detail": OLLAMA_UNAVAILABLE}
 
 
-def _stream_and_accumulate(model: str, messages: list[dict]) -> Iterator[dict]:
+def _stream_and_accumulate(model: str, messages: list[dict],
+                           request_id: str | None = None, cancel_event: threading.Event | None = None,) -> Iterator[dict]:
     """Stream one generation through the provider, re-emitting each token.
 
     The generator behaves as a coroutine: ``reply = yield from
@@ -676,7 +783,10 @@ def _stream_and_accumulate(model: str, messages: list[dict]) -> Iterator[dict]:
     wrapper turns into the existing `error` event.
     """
     parts: list[str] = []
-    request = ModelRequest(model=model, messages=messages, stream=True)
+    # request_id and cancel_event are passed a new stream is initiated to support mid-stream cancellation
+    request = ModelRequest(model=model, messages=messages, stream=True, 
+                           options={"request_id": request_id,
+                                    "cancel_event": cancel_event,},)
     for chunk in get_provider().stream(request):
         if not chunk.content:
             continue
