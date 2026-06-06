@@ -167,81 +167,13 @@ class OllamaProvider(ModelProvider):
                 if content:
                     yield ModelChunk(content=content)
                 return
-            # Iterate upstream chunks but try to close the upstream
-            # stream/response when the cancel_event is set so the
-            # underlying transport can be aborted early (best-effort).
-            # Some upstream stream implementations do not expose a
-            # synchronous ``close`` / ``aclose`` API. Iterating such a
-            # stream can block the current thread; to ensure the web
-            # generator can return promptly on cancellation we run the
-            # upstream iterator in a background producer thread and
-            # shuttle chunks via a Queue. The main thread polls the
-            # queue and stops immediately when ``cancel_event`` is set,
-            # ensuring the request handler unblocks and the result is
-            # not persisted. This does not forcibly abort the Ollama
-            # worker process in every environment (that would require
-            # transport-level abort support), but it isolates the
-            # blocking I/O from the request thread.
-            from queue import Queue, Empty
-
-            q: "Queue[object]" = Queue()
-            _SENTINEL = object()
-
-            def _producer():
-                try:
-                    for c in _iter_content_chunks(upstream):
-                        q.put(c)
-                except Exception as exc:  # put the exception for consumer
-                    q.put(exc)
-                finally:
-                    q.put(_SENTINEL)
-
-            prod_thread = threading.Thread(target=_producer, daemon=True)
-            prod_thread.start()
-
-            try:
-                while True:
-                    # Short timeout so we can react to cancel_event
-                    try:
-                        item = q.get(timeout=0.1)
-                    except Empty:
-                        if cancel_event is not None and cancel_event.is_set():
-                            # Best-effort attempt to close upstream if it
-                            # exposes a close hook. If it doesn't, simply
-                            # return so the request handler unblocks.
-                            try:
-                                aclose = getattr(upstream, "aclose", None)
-                                if callable(aclose):
-                                    try:
-                                        aclose()
-                                    except TypeError:
-                                        pass
-                                else:
-                                    close = getattr(upstream, "close", None)
-                                    if callable(close):
-                                        try:
-                                            close()
-                                        except Exception:
-                                            pass
-                            except Exception:
-                                pass
-                            return
-                        continue
-
-                    if item is _SENTINEL:
-                        break
-                    if isinstance(item, Exception):
-                        raise item
-
-                    if cancel_event is not None and cancel_event.is_set():
-                        return
-
-                    yield ModelChunk(content=item)
-            finally:
-                # Ensure the producer thread is not left blocked; if it
-                # is still running give it a moment to finish and move
-                # on — it's daemonized so it won't prevent shutdown.
-                prod_thread.join(timeout=0.01)
+            for chunk in _iter_content_chunks(upstream):
+                if cancel_event is not None and cancel_event.is_set():
+                    # Ollama's native Python client does not expose a cancel
+                    # hook for the stream object. We stop consuming and let
+                    # the caller treat the request as aborted.
+                    return
+                yield ModelChunk(content=chunk)
                 
         except _TRANSPORT_ERRORS as exc:
             raise ModelProviderError(str(exc) or "Ollama unreachable") from exc
