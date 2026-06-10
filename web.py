@@ -176,6 +176,7 @@ if NOVA_AUTO_WEB_LEARNING:
     scheduler.add_job(learn_from_feeds, "interval", hours=1)
 scheduler.add_job(check_and_update_models, "interval", weeks=1)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     initialize_db()

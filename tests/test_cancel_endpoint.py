@@ -2,19 +2,17 @@ import contextlib
 import json
 import sqlite3
 import sys
-import threading
-from unittest.mock import MagicMock, patch
-
 import pytest
+
+from unittest.mock import MagicMock, patch
+from core import chat as chat_module, memory as core_memory, ollama_client, users
+from memory import store as natural_store
 from fastapi.testclient import TestClient
+
 
 for _mod in ("ddgs", "ollama", "sgmllib", "feedparser"):
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
-
-from core import chat as chat_module, memory as core_memory, ollama_client, users
-from core.model_providers import ModelRequest, OllamaProvider
-from memory import store as natural_store
 
 
 @pytest.fixture
@@ -113,8 +111,6 @@ def test_cancel_endpoint_returns_404_for_other_user(db_path, web_client):
     import web
 
     alice = _make_user(db_path, "alice")
-    bob = _make_user(db_path, "bob")
-    a_token = _login(web_client, "alice")
     b_token = _login(web_client, "bob")
 
     request_id = web.tracker._request_id()
@@ -129,7 +125,6 @@ def test_cancel_endpoint_returns_404_for_other_user(db_path, web_client):
 
 def test_cancelled_stream_does_not_persist(db_path, web_client):
     """When a stream is cancelled mid-generation, nothing gets persisted.
-    
     Simulates the scenario where:
     1. Client calls /chat/stream and streaming begins
     2. Provider's cancellation check catches the cancel_event being set
@@ -169,16 +164,13 @@ def test_cancelled_stream_does_not_persist(db_path, web_client):
             json={"message": "hi", "mode": "chat"},
             headers=_h(token),
         )
-    
     # Verify the stream ended with error, not done
     assert resp.status_code == 200
     events = _decode_ndjson(resp.content)
     types = [e["type"] for e in events]
-    
     # Should have error event, NOT done (because generation was cancelled)
     assert "error" in types, f"Expected 'error' in event types, got: {types}"
-    assert "done" not in types, f"Cancelled stream should not have 'done' event"
-    
+    assert "done" not in types, "Cancelled stream should not have 'done' event"
     # Critically: verify nothing was persisted
     with sqlite3.connect(db_path) as conn:
         count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]

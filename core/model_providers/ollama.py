@@ -174,7 +174,6 @@ class OllamaProvider(ModelProvider):
                     # the caller treat the request as aborted.
                     return
                 yield ModelChunk(content=chunk)
-                
         except _TRANSPORT_ERRORS as exc:
             raise ModelProviderError(str(exc) or "Ollama unreachable") from exc
         except Exception as exc:  # noqa: BLE001 — narrowed below

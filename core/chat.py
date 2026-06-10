@@ -50,6 +50,7 @@ OLLAMA_UNAVAILABLE = "Ollama is unreachable. Make sure Ollama is running, then t
 class RequestCancelled(Exception):
     """Raised when users cancel request aborts a generation."""
 
+
 def _check_cancellation(cancel_event: threading.Event | None) -> None:
     if cancel_event is not None and cancel_event.is_set():
         raise RequestCancelled()
@@ -74,7 +75,7 @@ def _reply_is_uncertain(reply: str) -> bool:
     return any(trigger in lowered for trigger in UNCERTAINTY_TRIGGERS)
 
 
-def _generate(model: str, messages: list[dict], 
+def _generate(model: str, messages: list[dict],
               request_id: str | None = None,
               cancel_event: threading.Event | None = None,) -> str:
     """One non-streamed generation through the active model provider.
@@ -784,9 +785,9 @@ def _stream_and_accumulate(model: str, messages: list[dict],
     """
     parts: list[str] = []
     # request_id and cancel_event are passed a new stream is initiated to support mid-stream cancellation
-    request = ModelRequest(model=model, messages=messages, stream=True, 
+    request = ModelRequest(model=model, messages=messages, stream=True,
                            options={"request_id": request_id,
-                                    "cancel_event": cancel_event,},)
+                                    "cancel_event": cancel_event},)
     for chunk in get_provider().stream(request):
         if not chunk.content:
             continue
