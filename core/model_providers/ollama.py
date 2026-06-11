@@ -21,7 +21,7 @@ process restart.
 """
 
 from __future__ import annotations
-
+import threading
 from typing import Iterator, Optional
 
 import httpx
@@ -61,6 +61,13 @@ def _safe_get(obj, key: str):
         except TypeError:
             pass
     return getattr(obj, key, None)
+
+
+def _get_cancel_event(request: ModelRequest) -> threading.Event | None:
+    if not request.options:
+        return None
+    cancel_event = request.options.get("cancel_event")
+    return cancel_event if isinstance(cancel_event, threading.Event) else None
 
 
 def _iter_content_chunks(stream) -> Iterator[str]:
@@ -137,7 +144,10 @@ class OllamaProvider(ModelProvider):
 
     def stream(self, request: ModelRequest) -> Iterator[ModelChunk]:
         client = self._client()
+        cancel_event = _get_cancel_event(request)
         try:
+            if cancel_event is not None and cancel_event.is_set():
+                return
             try:
                 upstream = client.chat(
                     model=request.model,
@@ -158,6 +168,11 @@ class OllamaProvider(ModelProvider):
                     yield ModelChunk(content=content)
                 return
             for chunk in _iter_content_chunks(upstream):
+                if cancel_event is not None and cancel_event.is_set():
+                    # Ollama's native Python client does not expose a cancel
+                    # hook for the stream object. We stop consuming and let
+                    # the caller treat the request as aborted.
+                    return
                 yield ModelChunk(content=chunk)
         except _TRANSPORT_ERRORS as exc:
             raise ModelProviderError(str(exc) or "Ollama unreachable") from exc
