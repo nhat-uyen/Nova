@@ -111,6 +111,7 @@ def test_cancel_endpoint_returns_404_for_other_user(db_path, web_client):
     import web
 
     alice = _make_user(db_path, "alice")
+    _make_user(db_path, "bob")
     b_token = _login(web_client, "bob")
 
     request_id = web.tracker._request_id()
